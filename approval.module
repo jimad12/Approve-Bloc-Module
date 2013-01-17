@@ -1,0 +1,87 @@
+<?php
+// $Id$
+
+/**
+*
+*@file
+*Implements various block to improve pending content workflow.
+*/
+function approval_block($op = 'list', $delta = 0, $edit = array()) {
+  switch ($op) {
+    case 'list':
+    $block[0]['info'] = t('Pending comments');
+     $block[0]['cache'] = BLOCK_NO_CACHE;
+     
+     //Defining another block within this approval_block()
+     // function-one that lists all unpublished nodes and provides a link to their edit page.
+     $block[1]['info'] = t('Unpublished nodes');
+     $block[1]['cache'] = BLOCK_NO_CACHE;
+     return $block;
+     
+     // create a new form field that is visible after clciking the configure 
+     // link next to the block on the block administration page
+     case 'configure':
+     //Only in block 0 (The pending comments block) can one
+     // set the number of comments to display.
+     $form = array();
+     if($delta == 0) {
+     $form['approval_block_num_posts'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Number of pending comments to display'),
+      '#default_value' => variable_get('approval_block_num_posts', 5),
+     );
+   }
+     return $form;
+     
+     // You save the number of pending comments to display 
+     //using Drupal's built-in variable system with variable_set().
+     case 'save':
+     if ($delta == 0) {
+     variable_set('approval_block_num_posts',
+      (int)$edit['approval_block_num_posts']);
+    }
+     break;
+     
+     //Add the view operation and return a list 
+     //of pending comments when the block is viewed
+     case 'view': 
+     if ($delta == 0 && user_access('administer comments')) { 
+       // Retrieve the number of pending comments to display that 
+       // we saved earlier in the 'save' op, defaulting to 5.
+      $num_posts = variable_get('approval_block_num_posts', 5);
+      //Query the database for unpublished comments.
+      
+      $result = db_query_range('SELECT c.*FROM {comments} c WHERE c.status = %d ORDER BY c.timestamp', COMMENT_NOT_PUBLISHED, 0, $num_posts);
+      
+      // Preserve our current location so user can return after editing.
+      $destination = drupal_get_destination();
+      $items = array();
+      while($comment = db_fetch_object($result)) {
+        $items[] = l($comment->subject, 'node/' . $comment->nid,
+        array('fragment' => 'comment-' . $comment->cid)) . '' .
+        l(t('[edit]'), 'comment/edit/' . $comment->cid,
+        array('query' => $destination));
+        
+      }
+      $block['subject'] = t('Pending comments');
+      //We theme our array of links as an unordered list.
+      $block['content'] = theme('item_list', $items);
+      }
+      elseif ($delta == 1 && user_access('administer nodes')) { 
+        // Query the database for the 5 most recent unpublished 
+        // Unpublished nodes have their status column set to 0. 
+      $result = db_query_range('SELECT title, nid FROM {node} nodes WHERE  status = 0 ORDER BY changed DESC', 0, 5);
+        $destination = drupal_get_destination();
+         while ($node = db_fetch_object($result)) {
+         $items[] = l($node->title, 'node/' . $node->nid). ''  .
+           l(t('[edit]'), 'node/' . $node->nid . '/edit',
+           array('query' => $destination));
+      }
+      $block['subject'] = t('Unpublished nodes'); 
+      // We theme our array of links as an unordered list.
+       $block['content'] = theme('item_list', $items);
+     }
+     
+      return $block;
+  }
+}
