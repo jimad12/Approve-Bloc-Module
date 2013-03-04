@@ -1,5 +1,5 @@
 ; $Id$
 name = Approval
 description = Blocks for facilitating pending content workflow.
-package = James Audubon Development 
+package = James Web Wizard Development 
 core = 6.x
